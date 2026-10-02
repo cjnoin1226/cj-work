@@ -411,40 +411,60 @@
                     </div>
                 </div>
 
-                <!-- Admin Management Table: Edit/Delete Records -->
+                <!-- Admin Management: Sub-tabs -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                        <h3 class="text-base font-bold text-slate-800">
-                            <i class="fa-solid fa-pen-to-square text-blue-600 mr-1.5"></i> 전체 기록 수정 및 삭제
-                        </h3>
-                        <div class="flex items-center space-x-2">
-                            <input type="date" id="admin-filter-date" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
-                            <select id="admin-filter-emp" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
-                                <option value="ALL">전체 직원</option>
+                    <!-- Sub-tabs Header -->
+                    <div class="flex border-b border-slate-200 mb-6 space-x-2">
+                        <button onclick="switchAdminTab('commute')" id="admin-tab-btn-commute" class="py-2 px-4 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition">출퇴근 대장 관리</button>
+                        <button onclick="switchAdminTab('field')" id="admin-tab-btn-field" class="py-2 px-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition">외근 대장 관리</button>
+                    </div>
+
+                    <!-- Sub-tab 1: Admin Commute Ledger (가로형) -->
+                    <div id="admin-tab-commute" class="block space-y-4">
+                        <div class="flex items-center justify-between gap-4 mb-4">
+                            <div class="flex items-center bg-slate-100 border border-slate-300 rounded-lg p-1">
+                                <button onclick="changeAdminCommuteMonth(-1)" class="px-2 py-1 text-slate-600 hover:text-blue-600 hover:bg-white rounded transition text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                                <input type="month" id="admin-commute-month" onchange="renderAdminLedger()" class="bg-transparent font-bold text-xs px-2 text-slate-800 focus:outline-none">
+                                <button onclick="changeAdminCommuteMonth(1)" class="px-2 py-1 text-slate-600 hover:text-blue-600 hover:bg-white rounded transition text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                            <select id="admin-commute-emp" onchange="renderAdminLedger()" class="text-xs p-2.5 rounded-lg border border-slate-300 bg-slate-50 font-medium">
+                                <option value="ALL">전체 직원 보기</option>
                             </select>
+                        </div>
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead id="admin-commute-thead"></thead>
+                                <tbody id="admin-commute-tbody" class="divide-y divide-slate-200"></tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                    <th class="p-3">일시</th>
-                                    <th class="p-3">이름</th>
-                                    <th class="p-3">구분</th>
-                                    <th class="p-3">기록 시간</th>
-                                    <th class="p-3">행선지/메모</th>
-                                    <th class="p-3 text-right">관리 작업</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-ledger-tbody" class="divide-y divide-slate-100">
-                                <!-- Admin rows rendered dynamically -->
-                            </tbody>
-                        </table>
+                    <!-- Sub-tab 2: Admin Field Ledger (리스트형) -->
+                    <div id="admin-tab-field" class="hidden space-y-4">
+                        <div class="flex items-center justify-between gap-4 mb-4">
+                            <input type="date" id="admin-field-date" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
+                            <select id="admin-field-emp" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
+                                <option value="ALL">전체 직원</option>
+                            </select>
+                        </div>
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <th class="p-3">일시</th>
+                                        <th class="p-3">이름</th>
+                                        <th class="p-3">구분</th>
+                                        <th class="p-3">행선지 / 목적</th>
+                                        <th class="p-3">기록 시각</th>
+                                        <th class="p-3">메모</th>
+                                        <th class="p-3 text-right">관리 작업</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-field-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-
-            </div>
         </section>
 
     </main>
@@ -863,17 +883,20 @@
             const todayStr = today.toISOString().split('T')[0];
             const yearMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-            const monthEl = document.getElementById('commute-filter-month');
-            if (monthEl && !monthEl.value) monthEl.value = yearMonthStr;
+            const monthInputs = ['commute-filter-month', 'admin-commute-month'];
+            monthInputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.value) el.value = yearMonthStr;
+            });
 
-            const dateInputs = ['field-filter-date', 'admin-filter-date'];
+            const dateInputs = ['field-filter-date', 'admin-field-date'];
             dateInputs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && !el.value) el.value = todayStr;
             });
         }
 
-        // Master Render Function (Firebase 모듈에서도 접근할 수 있도록 Window 객체에 명시적 할당)
+        // Master Render Function
         window.renderAll = function renderAll() {
             populateEmployeeDropdowns();
             renderRecentActivities();
@@ -888,7 +911,7 @@
         function populateEmployeeDropdowns() {
             const emps = window.appState ? window.appState.employees : [];
             const empSelect = document.getElementById('emp-select');
-            const filterSelects = ['commute-filter-emp', 'field-filter-emp', 'admin-filter-emp'];
+            const filterSelects = ['commute-filter-emp', 'field-filter-emp', 'admin-commute-emp', 'admin-field-emp'];
 
             if (empSelect) {
                 const currentVal = empSelect.value;
@@ -1212,15 +1235,127 @@
             window.saveLogData(logEntry);
         }
 
-        // Render Admin Ledger
+        // Switch Admin Sub-Tabs
+        function switchAdminTab(tabName) {
+            document.getElementById('admin-tab-commute').classList.add('hidden');
+            document.getElementById('admin-tab-field').classList.add('hidden');
+            document.getElementById('admin-tab-btn-commute').className = "py-2 px-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition";
+            document.getElementById('admin-tab-btn-field').className = "py-2 px-4 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition";
+
+            document.getElementById(`admin-tab-${tabName}`).classList.remove('hidden');
+            document.getElementById(`admin-tab-btn-${tabName}`).className = "py-2 px-4 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition";
+            
+            renderAdminLedger();
+        }
+
+        function changeAdminCommuteMonth(offset) {
+            const monthInput = document.getElementById('admin-commute-month');
+            if (!monthInput || !monthInput.value) return;
+
+            const [y, m] = monthInput.value.split('-').map(Number);
+            const newDate = new Date(y, m - 1 + offset, 1);
+            monthInput.value = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}`;
+            renderAdminLedger();
+        }
+
+        // Render Both Admin Ledgers
         function renderAdminLedger() {
-            const tbody = document.getElementById('admin-ledger-tbody');
+            renderAdminCommuteLedger();
+            renderAdminFieldLedger();
+        }
+
+        // Admin Commute Ledger (가로형 대장 - 시간 클릭시 수정)
+        function renderAdminCommuteLedger() {
+            const tbody = document.getElementById('admin-commute-tbody');
+            const thead = document.getElementById('admin-commute-thead');
+            if (!tbody || !thead) return;
+
+            const filterMonth = document.getElementById('admin-commute-month')?.value;
+            const filterEmp = document.getElementById('admin-commute-emp')?.value || 'ALL';
+
+            if (!filterMonth) return;
+
+            const [year, month] = filterMonth.split('-').map(Number);
+            const totalDaysInMonth = new Date(year, month, 0).getDate();
+
+            const allEmployees = window.appState ? window.appState.employees : [];
+            let targetEmployees = filterEmp === 'ALL' ? allEmployees : allEmployees.filter(e => e.id === filterEmp);
+
+            if (targetEmployees.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = `<tr><td class="p-6 text-center text-slate-400">등록된 종사자가 없습니다.</td></tr>`;
+                return;
+            }
+
+            const allLogs = window.appState ? window.appState.logs : [];
+
+            let theadHTML = `
+                <tr class="bg-slate-200 text-slate-700 font-bold border-b border-slate-300 text-center text-[11px]">
+                    <th class="p-1.5 border-r border-slate-300 min-w-[30px] sticky left-0 bg-slate-200 z-10">연번</th>
+                    <th class="p-1.5 border-r border-slate-300 min-w-[70px] sticky left-[30px] bg-slate-200 z-10">성명</th>
+                    <th class="p-1.5 border-r border-slate-300 min-w-[40px] sticky left-[100px] bg-slate-200 z-10">구분</th>
+            `;
+            for (let d = 1; d <= totalDaysInMonth; d++) {
+                const day = new Date(year, month - 1, d).getDay();
+                let colorClass = 'text-slate-800';
+                if (day === 0) colorClass = 'text-rose-600';
+                if (day === 6) colorClass = 'text-blue-600';
+                theadHTML += `<th class="p-1 border-r border-slate-300 min-w-[35px] ${colorClass}">${d}</th>`;
+            }
+            theadHTML += `</tr>`;
+            thead.innerHTML = theadHTML;
+
+            let htmlRows = '';
+            targetEmployees.forEach((emp, index) => {
+                let inRowHTML = '', outRowHTML = '';
+
+                for (let d = 1; d <= totalDaysInMonth; d++) {
+                    const dayStr = String(d).padStart(2, '0');
+                    const monthStr = String(month).padStart(2, '0');
+                    const dateISO = `${year}-${monthStr}-${dayStr}`;
+                    const dayOfWeek = new Date(year, month - 1, d).getDay();
+                    const cellBg = (dayOfWeek === 0 || dayOfWeek === 6) ? 'bg-slate-100' : 'bg-white';
+
+                    const dayLogs = allLogs.filter(l => l.employeeId === emp.id && l.timestamp.startsWith(dateISO));
+                    const inLog = dayLogs.find(l => l.actionType === '출근');
+                    const outLog = dayLogs.find(l => l.actionType === '퇴근');
+
+                    let inTimeStr = inLog ? formatTime(inLog.timestamp).substring(0, 5) : '';
+                    let outTimeStr = outLog ? formatTime(outLog.timestamp).substring(0, 5) : '';
+
+                    // 시간이 있으면 클릭해서 수정 모달창 오픈 (파란색, 빨간색 링크 스타일 부여)
+                    const inCellAction = inLog ? `onclick="openEditModal('${inLog.id}')" class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg} cursor-pointer hover:bg-blue-100 text-blue-600 underline font-bold"` : `class="p-1 border border-slate-200 text-[10px] text-center ${cellBg}"`;
+                    const outCellAction = outLog ? `onclick="openEditModal('${outLog.id}')" class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg} cursor-pointer hover:bg-rose-100 text-rose-600 underline font-bold"` : `class="p-1 border border-slate-200 text-[10px] text-center ${cellBg}"`;
+
+                    inRowHTML += `<td ${inCellAction}>${inTimeStr}</td>`;
+                    outRowHTML += `<td ${outCellAction}>${outTimeStr}</td>`;
+                }
+
+                htmlRows += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-1 border border-slate-200 text-center font-bold text-[11px] bg-white sticky left-0 z-10" rowspan="2">${index + 1}</td>
+                        <td class="p-1 border border-slate-200 text-center font-bold text-[11px] bg-white sticky left-[30px] z-10" rowspan="2">${emp.name}</td>
+                        <td class="p-1 border border-slate-200 text-center text-[10px] font-semibold bg-slate-50 sticky left-[100px] z-10">출근</td>
+                        ${inRowHTML}
+                    </tr>
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-1 border border-slate-200 text-center text-[10px] font-semibold bg-slate-50 sticky left-[100px] z-10">퇴근</td>
+                        ${outRowHTML}
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = htmlRows;
+        }
+
+        // Admin Field Ledger (리스트형 외근 대장 - 수정/삭제 버튼)
+        function renderAdminFieldLedger() {
+            const tbody = document.getElementById('admin-field-tbody');
             if (!tbody) return;
 
-            const filterDate = document.getElementById('admin-filter-date')?.value;
-            const filterEmp = document.getElementById('admin-filter-emp')?.value;
+            const filterDate = document.getElementById('admin-field-date')?.value;
+            const filterEmp = document.getElementById('admin-field-emp')?.value;
 
-            let logs = [...(window.appState ? window.appState.logs : [])];
+            let logs = (window.appState ? window.appState.logs : []).filter(l => l.actionType === '외근출발' || l.actionType === '외근복귀');
 
             if (filterDate) {
                 logs = logs.filter(l => l.timestamp.startsWith(filterDate));
@@ -1230,29 +1365,25 @@
             }
 
             if (logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 text-xs">수정 가능한 기록이 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 text-xs">수정 가능한 기록이 없습니다.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = logs.map(log => {
-                let badgeStyle = 'bg-slate-100 text-slate-700';
-                if (log.actionType === '출근') badgeStyle = 'bg-emerald-100 text-emerald-800';
-                if (log.actionType === '퇴근') badgeStyle = 'bg-rose-100 text-rose-800';
-                if (log.actionType === '외근출발') badgeStyle = 'bg-amber-100 text-amber-800';
-                if (log.actionType === '외근복귀') badgeStyle = 'bg-indigo-100 text-indigo-800';
-
+                const badgeStyle = log.actionType === '외근출발' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800';
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="p-3 text-slate-600 font-mono text-xs">${formatDate(log.timestamp)}</td>
                         <td class="p-3 font-bold text-slate-800">${log.employeeName}</td>
                         <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-xs ${badgeStyle}">${log.actionType}</span></td>
-                        <td class="p-3 font-mono font-bold text-slate-800">${formatTime(log.timestamp)}</td>
-                        <td class="p-3 text-xs text-slate-600">${log.destination || log.memo || '-'}</td>
+                        <td class="p-3 text-xs text-slate-800">${log.destination || '-'}</td>
+                        <td class="p-3 font-mono font-bold text-slate-700">${formatTime(log.timestamp)}</td>
+                        <td class="p-3 text-slate-500 text-xs">${log.memo || '-'}</td>
                         <td class="p-3 text-right space-x-1">
-                            <button onclick="openEditModal('${log.id}')" class="text-xs bg-slate-100 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md transition font-medium">
+                            <button onclick="openEditModal('${log.id}')" class="text-xs bg-slate-100 hover:bg-blue-100 text-blue-700 px-2 py-1 rounded-md transition font-medium">
                                 <i class="fa-solid fa-pen"></i> 수정
                             </button>
-                            <button onclick="confirmDeleteRecord('${log.id}')" class="text-xs bg-slate-100 hover:bg-rose-100 text-rose-700 px-2.5 py-1 rounded-md transition font-medium">
+                            <button onclick="confirmDeleteRecord('${log.id}')" class="text-xs bg-slate-100 hover:bg-rose-100 text-rose-700 px-2 py-1 rounded-md transition font-medium">
                                 <i class="fa-solid fa-trash"></i> 삭제
                             </button>
                         </td>
