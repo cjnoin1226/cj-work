@@ -595,39 +595,38 @@
             ]
         };
 
-        // Initialize Firebase safely
+    // Initialize Firebase safely
         try {
-            if (typeof __firebase_config !== 'undefined') {
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+            const firebaseConfig = {
+              apiKey: "AIzaSyAljkqHpySoYhCIxTKpKfjeI6zuKpk4fD8",
+              authDomain: "cj-work-afaa7.firebaseapp.com",
+              aprojectId: "cj-work-afaa7",
+               storageBucket: "cj-work-afaa7.firebasestorage.app",
+               messagingSenderId: "958193817831",
+            appId: "1:958193817831:web:7996b4c3022a27e5ce6a42"
+            };
 
-                // Auth state setup
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        isFirebaseAvailable = true;
-                        updateSyncBadge('온라인 실시간 동기화', 'emerald');
-                        initFirestoreListeners();
-                    }
-                });
+            // Auth state setup
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
             } else {
-                loadFromLocalStorage();
-                updateSyncBadge('로컬 백업 모드', 'amber');
+                await signInAnonymously(auth);
             }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    isFirebaseAvailable = true;
+                    updateSyncBadge('온라인 실시간 동기화', 'emerald');
+                    initFirestoreListeners();
+                }
+            });
+            
         } catch (err) {
             console.warn("Firebase fallback mode activated:", err);
             loadFromLocalStorage();
             updateSyncBadge('로컬 저장 모드', 'slate');
         }
-
         // Firestore Listeners
         function initFirestoreListeners() {
             if (!db || !currentUser) return;
