@@ -1108,20 +1108,39 @@
                     const inLog = dayLogs.find(l => l.actionType === '출근');
                     const outLog = dayLogs.find(l => l.actionType === '퇴근');
 
+                    // 외근 기록 가져오기
+                    const fieldOutLog = dayLogs.find(l => l.actionType === '외근출발');
+                    const fieldInLog = dayLogs.find(l => l.actionType === '외근복귀');
+
                     let inTimeStr = inLog ? formatTime(inLog.timestamp).substring(0, 5) : '';
                     let outTimeStr = outLog ? formatTime(outLog.timestamp).substring(0, 5) : '';
 
-                    if (inLog && outLog) {
-                        const diffMins = Math.max(0, Math.floor((new Date(outLog.timestamp) - new Date(inLog.timestamp)) / 60000));
+                    // 외근 출발만 있고 출근 기록이 없다면 출근 시간에 외근 출발 시간을 표시 (주황색)
+                    if (!inLog && fieldOutLog) {
+                        inTimeStr = `<span class="text-amber-600 font-bold" title="외근출발">${formatTime(fieldOutLog.timestamp).substring(0, 5)}</span>`;
+                    }
+                    
+                    // 외근 복귀만 있고 퇴근 기록이 없다면 퇴근 시간에 외근 복귀 시간을 표시 (보라색)
+                    if (!outLog && fieldInLog) {
+                        outTimeStr = `<span class="text-indigo-600 font-bold" title="외근복귀">${formatTime(fieldInLog.timestamp).substring(0, 5)}</span>`;
+                    }
+
+                    // 근태 통계 처리 (출근 또는 외근출발이 있으면 출근일수로 인정)
+                    if ((inLog || fieldOutLog) && (outLog || fieldInLog)) {
+                        const inT = inLog ? new Date(inLog.timestamp) : new Date(fieldOutLog.timestamp);
+                        const outT = outLog ? new Date(outLog.timestamp) : new Date(fieldInLog.timestamp);
+                        
+                        const diffMins = Math.max(0, Math.floor((outT - inT) / 60000));
                         totalWorkedMinutes += diffMins; totalWorkedDays++;
-                        const inT = new Date(inLog.timestamp), outT = new Date(outLog.timestamp);
+                        
                         if (inT.getHours() > 9 || (inT.getHours() === 9 && inT.getMinutes() > 0) || outT.getHours() < 18) {
                             totalLateEarlyCount++; empLateEarlyCount++;
                         }
-                    } else if (inLog && !outLog) {
+                    } else if ((inLog || fieldOutLog) && !(outLog || fieldInLog)) {
                         totalWorkedDays++; totalMissingClockOut++; empMissingClockOut++;
                     }
 
+                    // 셀 렌더링
                     inRowHTML += `<td class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg}">${inTimeStr}</td>`;
                     outRowHTML += `<td class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg}">${outTimeStr}</td>`;
                 }
