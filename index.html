@@ -441,16 +441,39 @@
 
                     <!-- Sub-tab 2: Admin Field Ledger (리스트형) -->
                     <div id="admin-tab-field" class="hidden space-y-4">
-                        <div class="flex items-center justify-between gap-4 mb-4">
-                            <input type="date" id="admin-field-date" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
-                            <select id="admin-field-emp" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
-                                <option value="ALL">전체 직원</option>
-                            </select>
+                        
+                        <!-- 필터 및 다중 선택 컨트롤 바 -->
+                        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                            <div class="flex items-center space-x-2">
+                                <input type="date" id="admin-field-date" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
+                                <select id="admin-field-emp" onchange="renderAdminLedger()" class="text-xs p-2 rounded-lg border border-slate-300 bg-slate-50">
+                                    <option value="ALL">전체 직원</option>
+                                </select>
+                                
+                                <!-- 전체 선택 체크박스 -->
+                                <label class="flex items-center space-x-1.5 ml-3 cursor-pointer">
+                                    <input type="checkbox" id="admin-field-select-all" onchange="toggleAllFieldRecords(this)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                                    <span class="text-xs font-bold text-slate-700" id="admin-field-total-count">전체선택 (0건)</span>
+                                </label>
+                            </div>
+                            
+                            <!-- 선택 시 나타나는 액션 버튼들 (기본은 숨김) -->
+                            <div id="admin-field-bulk-actions" class="hidden items-center space-x-2 animate-in fade-in zoom-in duration-200">
+                                <span class="text-xs font-bold text-blue-600 mr-1"><span id="admin-field-selected-count">0</span>건 선택됨</span>
+                                <button onclick="deselectAllFieldRecords()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition font-medium shadow-sm">
+                                    선택해제
+                                </button>
+                                <button onclick="deleteSelectedFieldRecords()" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg transition font-medium border border-rose-200 shadow-sm">
+                                    선택삭제
+                                </button>
+                            </div>
                         </div>
+
                         <div class="overflow-x-auto border border-slate-200 rounded-xl">
                             <table class="w-full text-left border-collapse text-sm">
                                 <thead>
                                     <tr class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <th class="p-3 w-10 text-center">선택</th>
                                         <th class="p-3">일시</th>
                                         <th class="p-3">이름</th>
                                         <th class="p-3">구분</th>
@@ -1018,12 +1041,18 @@
             `;
         };
 
-        // Toggle Field Detail Inputs (외근 상세 폼 열기/닫기 - 누락 복원)
+        // 구분 선택 시각을 담아둘 전역 변수
+        let selectedActionTimestamp = null;
+
+        // Toggle Field Detail Inputs & Capture Click Timestamp
         window.toggleFieldInputs = function toggleFieldInputs() {
             const actionType = document.querySelector('input[name="action_type"]:checked')?.value;
             const fieldDetails = document.getElementById('field-details-container');
             const destInput = document.getElementById('field-destination');
             
+            // 사용자가 구분을 클릭하는 순간의 정확한 시각을 기록
+            selectedActionTimestamp = new Date().toISOString();
+
             if (actionType === '외근출발') {
                 fieldDetails.classList.remove('hidden');
                 destInput.required = true;
@@ -1033,10 +1062,50 @@
             }
         };
 
-        // Handle Main Form Submit (출퇴근/외근 폼 제출 처리 - 누락 복원)
+        // Handle Main Form Submit (출퇴근/외근 폼 제출 처리)
         window.handleLogSubmit = function handleLogSubmit(event) {
-// ... existing code ... // (중간 폼 제출 코드 생략 - 이 부분은 건드리지 마세요)
+            event.preventDefault();
+            
+            const empId = document.getElementById('emp-select').value;
+            if (!empId) {
+                showToast('사원을 선택해주세요.', 'rose');
+                return;
+            }
+
+            const actionType = document.querySelector('input[name="action_type"]:checked')?.value;
+            if (!actionType) {
+                showToast('구분을 선택해주세요.', 'rose');
+                return;
+            }
+
+            const empObj = window.appState.employees.find(e => e.id === empId);
+            const destination = document.getElementById('field-destination').value;
+            const purpose = document.getElementById('field-purpose').value;
+            const memo = document.getElementById('log-memo').value;
+            
+            // 구분을 클릭했던 순간의 시각 사용 (클릭하지 않았다면 현재 시각 폴백)
+            const finalTimestamp = selectedActionTimestamp || new Date().toISOString();
+
+            const logEntry = {
+                employeeId: empObj.id,
+                employeeName: empObj.name,
+                department: empObj.department,
+                position: empObj.position,
+                actionType: actionType,
+                timestamp: finalTimestamp,
+                destination: actionType === '외근출발' || actionType === '외근복귀' ? destination : '',
+                purpose: actionType === '외근출발' || actionType === '외근복귀' ? purpose : '',
+                memo: memo
+            };
+
+            window.saveLogData(logEntry);
+
+            // Reset form & timestamp variable
+            document.querySelector('input[name="action_type"]:checked').checked = false;
+            document.getElementById('field-destination').value = '';
+            document.getElementById('field-purpose').value = '';
             document.getElementById('log-memo').value = '';
+            selectedActionTimestamp = null;
             window.toggleFieldInputs();
         };
 
@@ -1383,8 +1452,14 @@
                 logs = logs.filter(l => l.employeeId === filterEmp);
             }
 
+            // 전체 선택 라벨의 총 건수 업데이트
+            const totalCountLabel = document.getElementById('admin-field-total-count');
+            if (totalCountLabel) totalCountLabel.textContent = `전체선택 (${logs.length}건)`;
+
             if (logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 text-xs">수정 가능한 기록이 없습니다.</td></tr>`;
+                // 열 개수가 8개이므로 colspan을 8로 변경
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 text-xs">수정 가능한 기록이 없습니다.</td></tr>`;
+                updateFieldBulkActions(); // 버튼 숨김 처리
                 return;
             }
 
@@ -1392,6 +1467,9 @@
                 const badgeStyle = log.actionType === '외근출발' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800';
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
+                        <td class="p-3 text-center">
+                            <input type="checkbox" value="${log.id}" class="admin-field-checkbox w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer" onchange="updateFieldBulkActions()">
+                        </td>
                         <td class="p-3 text-slate-600 font-mono text-xs">${formatDate(log.timestamp)}</td>
                         <td class="p-3 font-bold text-slate-800">${log.employeeName}</td>
                         <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-xs ${badgeStyle}">${log.actionType}</span></td>
@@ -1409,6 +1487,67 @@
                     </tr>
                 `;
             }).join('');
+
+            // 화면을 새로 그렸으므로 체크박스 상태 리셋
+            document.getElementById('admin-field-select-all').checked = false;
+            updateFieldBulkActions(); 
+        }
+
+        // --- 다중 선택 (Bulk Actions) 컨트롤 함수 ---
+        function updateFieldBulkActions() {
+            const checkboxes = document.querySelectorAll('.admin-field-checkbox');
+            const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            
+            const bulkActionContainer = document.getElementById('admin-field-bulk-actions');
+            const selectedCountSpan = document.getElementById('admin-field-selected-count');
+            const selectAllCheckbox = document.getElementById('admin-field-select-all');
+
+            if (!bulkActionContainer || !selectedCountSpan || !selectAllCheckbox) return;
+
+            // 하나라도 선택되면 버튼 보이기, 아니면 숨기기
+            if (selectedCount > 0) {
+                bulkActionContainer.classList.remove('hidden');
+                bulkActionContainer.classList.add('flex');
+                selectedCountSpan.textContent = selectedCount;
+            } else {
+                bulkActionContainer.classList.add('hidden');
+                bulkActionContainer.classList.remove('flex');
+            }
+
+            // 개별 체크박스가 전부 체크되었으면 '전체선택' 박스도 자동 체크되도록 동기화
+            if (checkboxes.length > 0 && selectedCount === checkboxes.length) {
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        function toggleAllFieldRecords(source) {
+            const checkboxes = document.querySelectorAll('.admin-field-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+            updateFieldBulkActions();
+        }
+
+        function deselectAllFieldRecords() {
+            const selectAllCheckbox = document.getElementById('admin-field-select-all');
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            toggleAllFieldRecords(selectAllCheckbox);
+        }
+
+        async function deleteSelectedFieldRecords() {
+            const checkboxes = document.querySelectorAll('.admin-field-checkbox:checked');
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedIds.length === 0) return;
+
+            if (confirm(`선택한 ${selectedIds.length}건의 기록을 정말 한 번에 삭제하시겠습니까?`)) {
+                // 기존의 단일 삭제 함수(deleteLogData)를 순회하며 실행합니다. 
+                // 실행 후 자동으로 렌더링(renderAll)이 되며 목록이 갱신됩니다.
+                for (const id of selectedIds) {
+                    await window.deleteLogData(id);
+                }
+                showToast(`${selectedIds.length}건이 일괄 삭제되었습니다.`, 'success');
+            }
         }
 
         // Summary Statistics Calculation
