@@ -595,16 +595,20 @@
             ]
         };
 
-    // Initialize Firebase safely
+        // Initialize Firebase safely
         try {
             const firebaseConfig = {
               apiKey: "AIzaSyAljkqHpySoYhCIxTKpKfjeI6zuKpk4fD8",
               authDomain: "cj-work-afaa7.firebaseapp.com",
-              aprojectId: "cj-work-afaa7",
-               storageBucket: "cj-work-afaa7.firebasestorage.app",
-               messagingSenderId: "958193817831",
-            appId: "1:958193817831:web:7996b4c3022a27e5ce6a42"
+              projectId: "cj-work-afaa7",
+              storageBucket: "cj-work-afaa7.firebasestorage.app",
+              messagingSenderId: "958193817831",
+              appId: "1:958193817831:web:7996b4c3022a27e5ce6a42"
             };
+
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
 
             // Auth state setup
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -627,6 +631,7 @@
             loadFromLocalStorage();
             updateSyncBadge('로컬 저장 모드', 'slate');
         }
+
         // Firestore Listeners
         function initFirestoreListeners() {
             if (!db || !currentUser) return;
