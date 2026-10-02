@@ -317,16 +317,8 @@
                 <!-- Integrated Monthly Ledger Table -->
                 <div class="overflow-x-auto border border-slate-200 rounded-xl">
                     <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-center">
-                                <th class="p-3 w-28">날짜 (요일)</th>
-                                <th class="p-3 w-32">종사자 이름</th>
-                                <th class="p-3 w-28">출근 시각</th>
-                                <th class="p-3 w-28">퇴근 시각</th>
-                                <th class="p-3 w-28">총 근무시간</th>
-                                <th class="p-3 w-28">근무 상태</th>
-                                <th class="p-3">외근 내역 / 비고</th>
-                            </tr>
+                        <!-- 자바스크립트가 쉽게 그릴 수 있도록 id를 부여하고 내부를 비웁니다 -->
+                        <thead id="commute-ledger-thead">
                         </thead>
                         <tbody id="commute-ledger-tbody" class="divide-y divide-slate-200">
                             <!-- Monthly sheet rows dynamically computed and populated -->
@@ -1020,53 +1012,16 @@
 
         // Handle Main Form Submit (출퇴근/외근 폼 제출 처리 - 누락 복원)
         window.handleLogSubmit = function handleLogSubmit(event) {
-            event.preventDefault();
-            
-            const empId = document.getElementById('emp-select').value;
-            if (!empId) {
-                showToast('사원을 선택해주세요.', 'rose');
-                return;
-            }
-
-            const actionType = document.querySelector('input[name="action_type"]:checked')?.value;
-            if (!actionType) {
-                showToast('구분을 선택해주세요.', 'rose');
-                return;
-            }
-
-            const empObj = window.appState.employees.find(e => e.id === empId);
-            const destination = document.getElementById('field-destination').value;
-            const purpose = document.getElementById('field-purpose').value;
-            const memo = document.getElementById('log-memo').value;
-            
-            const now = new Date();
-
-            const logEntry = {
-                employeeId: empObj.id,
-                employeeName: empObj.name,
-                department: empObj.department,
-                position: empObj.position,
-                actionType: actionType,
-                timestamp: now.toISOString(),
-                destination: actionType === '외근출발' || actionType === '외근복귀' ? destination : '',
-                purpose: actionType === '외근출발' || actionType === '외근복귀' ? purpose : '',
-                memo: memo
-            };
-
-            window.saveLogData(logEntry);
-
-            // Reset form
-            document.querySelector('input[name="action_type"]:checked').checked = false;
-            document.getElementById('field-destination').value = '';
-            document.getElementById('field-purpose').value = '';
+// ... existing code ... // (중간 폼 제출 코드 생략 - 이 부분은 건드리지 마세요)
             document.getElementById('log-memo').value = '';
             window.toggleFieldInputs();
         };
 
-        // Render Commute Ledger Table (Full Monthly Timesheet View)
+        // Render Commute Ledger Table (엑셀 형태의 가로형 레이아웃)
         function renderCommuteLedger() {
             const tbody = document.getElementById('commute-ledger-tbody');
-            if (!tbody) return;
+            const thead = document.getElementById('commute-ledger-thead');
+            if (!tbody || !thead) return;
 
             const filterMonth = document.getElementById('commute-filter-month')?.value;
             const filterEmp = document.getElementById('commute-filter-emp')?.value || 'ALL';
@@ -1075,9 +1030,7 @@
 
             const [year, month] = filterMonth.split('-').map(Number);
             const totalDaysInMonth = new Date(year, month, 0).getDate();
-            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
-            // Target employees list
             const allEmployees = window.appState ? window.appState.employees : [];
             let targetEmployees = allEmployees;
             if (filterEmp !== 'ALL') {
@@ -1085,142 +1038,90 @@
             }
 
             if (targetEmployees.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">등록된 종사자가 없습니다.</td></tr>`;
+                thead.innerHTML = '';
+                tbody.innerHTML = `<tr><td class="p-6 text-center text-slate-400">등록된 종사자가 없습니다.</td></tr>`;
                 return;
             }
 
             const allLogs = window.appState ? window.appState.logs : [];
-            
-            let totalWorkedDays = 0;
-            let totalWorkedMinutes = 0;
-            let totalLateEarlyCount = 0;
-            let totalMissingClockOut = 0;
+            let totalWorkedDays = 0, totalWorkedMinutes = 0, totalLateEarlyCount = 0, totalMissingClockOut = 0;
+
+            let theadHTML = `
+                <tr class="bg-slate-200 text-slate-700 font-bold border-b border-slate-300 text-center text-[11px]">
+                    <th class="p-1.5 border-r border-slate-300 min-w-[30px] sticky left-0 bg-slate-200 z-10">연번</th>
+                    <th class="p-1.5 border-r border-slate-300 min-w-[70px] sticky left-[30px] bg-slate-200 z-10">성명</th>
+                    <th class="p-1.5 border-r border-slate-300 min-w-[40px] sticky left-[100px] bg-slate-200 z-10">구분</th>
+            `;
+            for (let d = 1; d <= totalDaysInMonth; d++) {
+                const dateObj = new Date(year, month - 1, d);
+                const day = dateObj.getDay();
+                let colorClass = 'text-slate-800';
+                if (day === 0) colorClass = 'text-rose-600';
+                if (day === 6) colorClass = 'text-blue-600';
+                theadHTML += `<th class="p-1 border-r border-slate-300 min-w-[35px] ${colorClass}">${d}</th>`;
+            }
+            theadHTML += `
+                    <th class="p-1.5 border-r border-slate-300 min-w-[40px]">지각<br>/조퇴</th>
+                    <th class="p-1.5 min-w-[40px]">미퇴근</th>
+                </tr>
+            `;
+            thead.innerHTML = theadHTML;
 
             let htmlRows = '';
-
-            // Generate monthly rows for target employees
-            targetEmployees.forEach(emp => {
-                // Header row when viewing all employees
-                if (targetEmployees.length > 1) {
-                    htmlRows += `
-                        <tr class="bg-slate-800 text-white font-bold">
-                            <td colspan="7" class="px-4 py-2 text-xs">
-                                <i class="fa-solid fa-user-tie mr-1.5 text-blue-400"></i> ${emp.name} ${emp.position} (${emp.department})
-                            </td>
-                        </tr>
-                    `;
-                }
+            targetEmployees.forEach((emp, index) => {
+                let inRowHTML = '';
+                let outRowHTML = '';
+                let empLateEarlyCount = 0, empMissingClockOut = 0;
 
                 for (let d = 1; d <= totalDaysInMonth; d++) {
                     const dayStr = String(d).padStart(2, '0');
                     const monthStr = String(month).padStart(2, '0');
                     const dateISO = `${year}-${monthStr}-${dayStr}`;
-                    const dateObj = new Date(year, month - 1, d);
-                    const dayOfWeekNum = dateObj.getDay();
-                    const dayOfWeekName = dayNames[dayOfWeekNum];
-                    const isWeekend = (dayOfWeekNum === 0 || dayOfWeekNum === 6);
+                    const dayOfWeek = new Date(year, month - 1, d).getDay();
+                    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                    const cellBg = isWeekend ? 'bg-slate-100' : 'bg-white';
 
-                    // Find employee logs for this day
                     const dayLogs = allLogs.filter(l => l.employeeId === emp.id && l.timestamp.startsWith(dateISO));
+                    const inLog = dayLogs.find(l => l.actionType === '출근');
+                    const outLog = dayLogs.find(l => l.actionType === '퇴근');
 
-                    // Get Clock In (Earliest) and Clock Out (Latest)
-                    const inLogs = dayLogs.filter(l => l.actionType === '출근').sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-                    const outLogs = dayLogs.filter(l => l.actionType === '퇴근').sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-                    const fieldLogs = dayLogs.filter(l => l.actionType === '외근출발' || l.actionType === '외근복귀');
+                    let inTimeStr = inLog ? formatTime(inLog.timestamp).substring(0, 5) : '';
+                    let outTimeStr = outLog ? formatTime(outLog.timestamp).substring(0, 5) : '';
 
-                    const inLog = inLogs.length > 0 ? inLogs[0] : null;
-                    const outLog = outLogs.length > 0 ? outLogs[0] : null;
-
-                    let inTimeStr = '-';
-                    let outTimeStr = '-';
-                    let workDurationStr = '-';
-                    let statusBadge = '';
-                    let noteStr = '';
-
-                    if (inLog) {
-                        inTimeStr = formatTime(inLog.timestamp);
-                    }
-                    if (outLog) {
-                        outTimeStr = formatTime(outLog.timestamp);
-                    }
-
-                    // Calculate working hours & status
                     if (inLog && outLog) {
-                        const inTime = new Date(inLog.timestamp);
-                        const outTime = new Date(outLog.timestamp);
-                        const diffMins = Math.max(0, Math.floor((outTime - inTime) / (1000 * 60)));
-                        
-                        totalWorkedMinutes += diffMins;
-                        totalWorkedDays++;
-
-                        const hrs = Math.floor(diffMins / 60);
-                        const mins = diffMins % 60;
-                        workDurationStr = `${hrs}시간 ${mins}분`;
-
-                        // Late or early check (Assuming 09:00 in, 18:00 out)
-                        const isLate = (inTime.getHours() > 9 || (inTime.getHours() === 9 && inTime.getMinutes() > 0));
-                        const isEarly = (outTime.getHours() < 18);
-
-                        if (isLate && isEarly) {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">지각+조퇴</span>`;
-                            totalLateEarlyCount++;
-                        } else if (isLate) {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">지각</span>`;
-                            totalLateEarlyCount++;
-                        } else if (isEarly) {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">조퇴</span>`;
-                            totalLateEarlyCount++;
-                        } else {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">정상근무</span>`;
+                        const diffMins = Math.max(0, Math.floor((new Date(outLog.timestamp) - new Date(inLog.timestamp)) / 60000));
+                        totalWorkedMinutes += diffMins; totalWorkedDays++;
+                        const inT = new Date(inLog.timestamp), outT = new Date(outLog.timestamp);
+                        if (inT.getHours() > 9 || (inT.getHours() === 9 && inT.getMinutes() > 0) || outT.getHours() < 18) {
+                            totalLateEarlyCount++; empLateEarlyCount++;
                         }
                     } else if (inLog && !outLog) {
-                        totalWorkedDays++;
-                        totalMissingClockOut++;
-                        statusBadge = `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">미퇴근</span>`;
-                    } else if (!inLog && outLog) {
-                        statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">출근누락</span>`;
-                    } else {
-                        if (isWeekend) {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">주말</span>`;
-                        } else {
-                            statusBadge = `<span class="px-2 py-0.5 rounded bg-slate-50 text-slate-400 font-normal">결근/미기록</span>`;
-                        }
+                        totalWorkedDays++; totalMissingClockOut++; empMissingClockOut++;
                     }
 
-                    // Field notes
-                    if (fieldLogs.length > 0) {
-                        const fieldDestinations = fieldLogs.map(fl => fl.destination).filter(Boolean).join(', ');
-                        noteStr = fieldDestinations ? `[외근] ${fieldDestinations}` : '[외근 이력 있음]';
-                    }
-                    if (inLog && inLog.memo) noteStr += (noteStr ? ' / ' : '') + inLog.memo;
-
-                    // Weekend row style
-                    let bgRowClass = 'hover:bg-slate-50 transition';
-                    if (dayOfWeekNum === 6) bgRowClass = 'bg-blue-50/30 hover:bg-blue-50/50'; // Sat
-                    if (dayOfWeekNum === 0) bgRowClass = 'bg-rose-50/30 hover:bg-rose-50/50'; // Sun
-
-                    htmlRows += `
-                        <tr class="${bgRowClass}">
-                            <td class="p-2.5 text-center font-mono font-medium ${dayOfWeekNum === 0 ? 'text-rose-600 font-bold' : (dayOfWeekNum === 6 ? 'text-blue-600 font-bold' : 'text-slate-700')}">
-                                ${monthStr}.${dayStr} (${dayOfWeekName})
-                            </td>
-                            <td class="p-2.5 font-bold text-slate-800 text-center">${emp.name}</td>
-                            <td class="p-2.5 font-mono text-center font-semibold text-slate-700">${inTimeStr}</td>
-                            <td class="p-2.5 font-mono text-center font-semibold text-slate-700">${outTimeStr}</td>
-                            <td class="p-2.5 font-mono text-center font-bold text-blue-700">${workDurationStr}</td>
-                            <td class="p-2.5 text-center">${statusBadge}</td>
-                            <td class="p-2.5 text-slate-600 text-xs truncate max-w-xs">${noteStr || '-'}</td>
-                        </tr>
-                    `;
+                    inRowHTML += `<td class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg}">${inTimeStr}</td>`;
+                    outRowHTML += `<td class="p-1 border border-slate-200 text-[10px] font-mono text-center ${cellBg}">${outTimeStr}</td>`;
                 }
+
+                htmlRows += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-1 border border-slate-200 text-center font-bold text-[11px] bg-white sticky left-0 z-10" rowspan="2">${index + 1}</td>
+                        <td class="p-1 border border-slate-200 text-center font-bold text-[11px] bg-white sticky left-[30px] z-10" rowspan="2">${emp.name}</td>
+                        <td class="p-1 border border-slate-200 text-center text-[10px] font-semibold bg-slate-50 sticky left-[100px] z-10">출근</td>
+                        ${inRowHTML}
+                        <td class="p-1 border border-slate-200 text-center text-[11px] text-amber-600 font-bold bg-white" rowspan="2">${empLateEarlyCount > 0 ? empLateEarlyCount : ''}</td>
+                        <td class="p-1 border border-slate-200 text-center text-[11px] text-rose-600 font-bold bg-white" rowspan="2">${empMissingClockOut > 0 ? empMissingClockOut : ''}</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-1 border border-slate-200 text-center text-[10px] font-semibold bg-slate-50 sticky left-[100px] z-10">퇴근</td>
+                        ${outRowHTML}
+                    </tr>
+                `;
             });
 
             tbody.innerHTML = htmlRows;
 
-            // Update KPI Banner Stats
-            const totalHours = Math.floor(totalWorkedMinutes / 60);
-            const totalMins = totalWorkedMinutes % 60;
-
+            const totalHours = Math.floor(totalWorkedMinutes / 60), totalMins = totalWorkedMinutes % 60;
             document.getElementById('monthly-stat-days').textContent = `${totalWorkedDays} 일`;
             document.getElementById('monthly-stat-hours').textContent = `${totalHours}시간 ${totalMins}분`;
             document.getElementById('monthly-stat-late').textContent = `${totalLateEarlyCount} 건`;
